@@ -95,18 +95,17 @@ async function init(){
     var wmsLayers = [];
     WMSCapabilites.Capability.Layer.Layer.forEach(element => {
         wmsHtmlContent += `<input type="radio" name="wmsLayersRadioButton" value="${element.Name}">${element.Title}<br>`;
-        var newLayer = new ol.layer.Tile({
+        var newLayer = new ol.layer.Image({
             extent: extent,
             visible: false,
             title: element.Title,
             name: element.Name,
-            source: new ol.source.TileWMS({
+            source: new ol.source.ImageWMS({
                 url: ogcServer,
                 crossOrigin: 'anonymous',
                 params: {
                 'LAYERS': element.Name,
                 'FORMAT': 'image/png',
-                'TILED': true,
                 'VERSION': '1.3.0'
                 },
                 serverType: 'mapserver',
