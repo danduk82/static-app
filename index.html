@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>type 2 viewer</title>
+        <link rel="stylesheet" href="./basic.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/css/ol.css">
+    </head>
+    <body>
+        <div class="grid-container">
+            <div class="grid-1">
+                <div class="sidebar">
+                    <div class="wmslayers">
+                        <h2>WMS layers</h2>
+                    </div>
+                    <div class="baselayers">
+                        <h2>BaseLayers</h2>
+                        <input type="radio" name="baseLayersRadioButton" value="SwisstopoOrthophoto">Orthophoto<br>
+                        <input type="radio" name="baseLayersRadioButton" value="SwisstopoColorBaseMap">Color Basemap<br>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div id="js-map" class="map"></div>
+            </div>
+        </div>
+        <div class="overlay-container">
+            <span class="overlay-text" id="feature-name"></span><br>
+            <span class="overlay-text" id="feature-additionalinfo"></span><br>
+        </div>        
+        <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/build/ol.js"></script>        
+        <script src='./main.js'></script>
+    </body>
+</html>
