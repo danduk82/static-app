@@ -11,11 +11,12 @@ body {
     display: grid;
     grid-template-columns: 10vw 90vw;
     grid-template-rows: 100vh;
+    overflow-y: scroll;
 }
 
 .sidebar {
     margin-left: 15px;
-    overflow: scroll;
+    overflow-y: scroll;
 }
 
 .map {
@@ -25,5 +26,5 @@ body {
 
 .log-container {
     height: 400px;
-    overflow-y: scroll;
+    overflow: scroll;
   }

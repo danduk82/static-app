@@ -25,7 +25,8 @@ async function init(){
     projection2056.setExtent([2420000, 130000, 2900000, 1350000]);
 
     const mapview = new ol.View({
-        center: [2704797.927462143, 1133233.253751486],
+        center: [2558997.668686577,1210113.4804185992],
+        // center: [2704797.927462143, 1133233.253751486],
         projection: projection2056,
         zoom: 14,
     });
@@ -76,16 +77,32 @@ async function init(){
     var WMSparser = new ol.format.WMSCapabilities();
     
 
-    
-    fetch('https://sitn.ne.ch/production/wsgi/mapserv_proxy?ogcserver=source+for+image%2Fpng&cache_version=c7559c4ea1aa46b0997e4998b6436977&SERVICE=WMS&VERSION=1.3.0&REQUEST=Capabilities')
-      .then(function (response) {
-        return response.text();
-      })
-      .then(function (text) {
-        var result = WMSparser.read(text);
-        document.getElementById('log').innerText = JSON.stringify(result, null, 2);
-      });
+    var WMSrawCap = await fetch('https://sitn.ne.ch/production/wsgi/mapserv_proxy?ogcserver=source+for+image%2Fpng&cache_version=c7559c4ea1aa46b0997e4998b6436977&SERVICE=WMS&VERSION=1.3.0&REQUEST=Capabilities').then((response) => response.text())
+    var WMSCapabilites = WMSparser.read(WMSrawCap);
+    WMSCapabilites.Capability.Layer.Layer.forEach(element => console.log(element));
 
+    var wmsHtmlContent = '<h2>WMS layers</h2>';
+    WMSCapabilites.Capability.Layer.Layer.forEach(element => {
+        wmsHtmlContent += `<input type="radio" name="${element.Name}" value="SwisstopoOrthophoto">${element.Title}<br>`;
+    });
+    document.getElementById('wmslayers').innerHTML = wmsHtmlContent;
+    // var wmsLayer = new ol.layer.Tile({
+    //     extent: extent,
+    //     source: new ol.source.TileWMS({
+    //       url: 'https://wms.geo.admin.ch/',
+    //       crossOrigin: 'anonymous',
+    //       params: {
+    //         'LAYERS': element.Name,
+    //         'FORMAT': 'image/png',
+    //         'TILED': true,
+    //         'VERSION': '1.1.1'
+    //       },
+    //       serverType: 'mapserver'
+    //     })
+    //   });
+
+    // document.getElementById('log').innerText = JSON.stringify(WMSCapabilites, null, 2);
+      
 
     const overlayContainerElement = document.querySelector('.overlay-container');
     // const overlayLayer = ol.Overlay({
@@ -98,7 +115,7 @@ async function init(){
     map.on('click',function(e){
         // overlayLayer.setPosition(undefined);
         let clickedCoordinates = e.coordinate;
-        console.log(`clicked coordinates: {clickedCoordinates}`);
+        console.log(`clicked coordinates: ${clickedCoordinates}`);
         // map.forEachFeatureAtPixel(e.pixel, function(feature, layer){
         //     console.log(feature.getKeys());
         //     overlayLayer.setPosition(clickedCoordinates);
@@ -109,7 +126,18 @@ async function init(){
         // })
     })
 
-    const baseLayerElements = document.querySelectorAll('.sidebar > input[type=radio]');
+    const WMSLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
+
+    for(let WMSLayerElement of WMSLayerElements){
+        WMSLayerElement.addEventListener('change', function(){
+            let WMSLayerElementValue = this.value;
+            WMTSLayerGroup.getLayers().forEach(function(element, index, array){
+               let baseLayerTitle = element.get('title');
+               element.setVisible(baseLayerTitle === WMSLayerElementValue);
+            })
+        })
+    }
+    const baseLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
 
     for(let baseLayerElement of baseLayerElements){
         baseLayerElement.addEventListener('change', function(){
@@ -120,4 +148,9 @@ async function init(){
             })
         })
     }
+}
+
+function recenter(east, north) {
+    var map = document.getElementById('js-map');
+    map.getView().setCenter([east, north]);
 }
