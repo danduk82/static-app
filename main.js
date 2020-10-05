@@ -25,8 +25,7 @@ async function init(){
     projection2056.setExtent([2420000, 130000, 2900000, 1350000]);
 
     const mapview = new ol.View({
-        center: [2558997.668686577,1210113.4804185992],
-        // center: [2704797.927462143, 1133233.253751486],
+        center: [2561892.6539999316,1205224.086300917],
         projection: projection2056,
         zoom: 14,
     });
@@ -60,10 +59,21 @@ async function init(){
         title: 'SwisstopoColorBaseMap',
         visible: false
     }) 
+    const wmtsLayer3 = new ol.layer.Tile({
+        opacity: 1,
+        source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
+            layer: 'ch.swisstopo.pixelkarte-grau',
+            matrixSet: '2056_26',
+            projection: projection2056,
+        })),
+        title: 'SwisstopoGreyBaseMap',
+        visible: false
+    }) 
+
   
     const WMTSLayerGroup = new ol.layer.Group({
         layers: [
-            wmtsLayer1, wmtsLayer2
+            wmtsLayer1, wmtsLayer2, wmtsLayer3
         ]
     })
     
@@ -74,21 +84,22 @@ async function init(){
     map.addLayer(WMTSLayerGroup);
 
     
+    // construct WMS layer tree
     var WMSparser = new ol.format.WMSCapabilities();
-    
     var ogcServer = 'https://sitn.ne.ch/production/wsgi/mapserv_proxy?ogcserver=source+for+image%2Fpng&cache_version=c7559c4ea1aa46b0997e4998b6436977'
     var WMSrawCap = await fetch(ogcServer + '&SERVICE=WMS&VERSION=1.3.0&REQUEST=Capabilities').then((response) => response.text())
     var WMSCapabilites = WMSparser.read(WMSrawCap);
-    WMSCapabilites.Capability.Layer.Layer.forEach(element => console.log(element));
+    //WMSCapabilites.Capability.Layer.Layer.forEach(element => console.log(element));
 
     var wmsHtmlContent = '<h2>WMS layers</h2>';
     var wmsLayers = [];
     WMSCapabilites.Capability.Layer.Layer.forEach(element => {
-        wmsHtmlContent += `<input type="radio" name="${element.Name}" value="${element.Name}">${element.Title}<br>`;
+        wmsHtmlContent += `<input type="radio" name="wmsLayersRadioButton" value="${element.Name}">${element.Title}<br>`;
         var newLayer = new ol.layer.Tile({
             extent: extent,
             visible: false,
             title: element.Title,
+            name: element.Name,
             source: new ol.source.TileWMS({
                 url: ogcServer,
                 crossOrigin: 'anonymous',
@@ -96,7 +107,7 @@ async function init(){
                 'LAYERS': element.Name,
                 'FORMAT': 'image/png',
                 'TILED': true,
-                'VERSION': '1.1.1'
+                'VERSION': '1.3.0'
                 },
                 serverType: 'mapserver',
             })
@@ -135,17 +146,19 @@ async function init(){
         // })
     })
 
+    // layer selector WMS
     const WMSLayerElements = document.querySelectorAll('.wmslayers > input[type=radio]');
     for(let WMSLayerElement of WMSLayerElements){
         WMSLayerElement.addEventListener('change', function(){
             let WMSLayerElementValue = this.value;
             WMSLayerGroup.getLayers().forEach(function(element, index, array){
-               let wmsLayerTitle = element.get('title');
+               let wmsLayerTitle = element.get('name');
                element.setVisible(wmsLayerTitle === WMSLayerElementValue);
             })
         })
     }
 
+    // layer selector basemap
     const baseLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
     for(let baseLayerElement of baseLayerElements){
         baseLayerElement.addEventListener('change', function(){

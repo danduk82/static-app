@@ -17,6 +17,7 @@ body {
     margin-left: 15px;
 }
 .wmslayers {
+    height: 70vh;
     overflow-x: scroll;
 }
 .map {
