@@ -14,11 +14,19 @@ body {
 }
 
 .sidebar {
-    margin-left: 15px;
+    margin-left: 1px;
+    margin-right: 1px;
+ }
+
+.baselayers{
+    border: 1px solid #848584;
+    overflow: scroll;
+    height: 20vh;
 }
 .wmslayers {
-    height: 70vh;
+    border: 1px solid #848584;
     overflow-x: scroll;
+    height: 80vh;
 }
 .map {
     height: 100vh;
