@@ -28,69 +28,91 @@ function sanitizeUrl(url){
     return (url.indexOf('?') < 0) ? url+'?' : url;
 }
 
-async function createWMTSlayers(wmtsLayersConfig, projection){
+function clearRadioButton(radioButtonId){
+    var ele = document.getElementsByName(radioButtonId);
+   for(var i=0;i<ele.length;i++)
+      ele[i].checked = false;
+}
+
+async function createWMTSlayers(element, projection){
     var WMTSparser = new ol.format.WMTSCapabilities();
     var wmtsLayers = [];
     var wmtsHtmlContent = '';
-    wmtsLayersConfig.forEach(async (element) => {
-        var capabilitiesText = await fetch(element.serverurl).then((response) => response.text());
-        var WMTScapabilities = WMTSparser.read(capabilitiesText);
-        wmtsHtmlContent += `<h3>${element.title}</h3>`;
-        element.layers.forEach(layer => {
-            var wmtsLayer = new ol.layer.Tile({
-                opacity: 1,
-                source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
-                    layer: layer.name,
-                    matrixSet: layer.matrixset,
-                    projection: projection,
-                })),
-                title: layer.title,
-                visible: false
-            })
-            wmtsLayers.push(wmtsLayer);
-            wmtsHtmlContent += `<input type="radio" name="wmtsLayersRadioButton" value="${layer.name}">${layer.title}<br>`;
-        });
+    var capabilitiesText = await fetch(element.serverurl).then((response) => response.text());
+    var WMTScapabilities = WMTSparser.read(capabilitiesText);
+    wmtsHtmlContent += `<h3>${element.title}</h3>`;
+    element.layers.forEach(layer => {
+        var wmtsLayer = new ol.layer.Tile({
+            opacity: 1,
+            source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
+                layer: layer.name,
+                matrixSet: layer.matrixset,
+                projection: projection,
+            })),
+            title: layer.title,
+            name: layer.name,
+            visible: false
+        })
+        wmtsLayers.push(wmtsLayer);
+        wmtsHtmlContent += `<input type="radio" name="layersRadioButton" value="${layer.name}">${layer.title}<br>`;
     });
-    const WMTSBaseLayerGroup = new ol.layer.Group({
-        layers: wmtsLayers
-    })
-    return {layers: WMTSBaseLayerGroup, htmlPart: wmtsHtmlContent};
+    return {layers: wmtsLayers, htmlPart: wmtsHtmlContent};
 }
 
 
-async function createWMSlayers(wmsLayersConfig){
+async function createWMSlayers(element){
     // construct WMS layer tree
     var WMSparser = new ol.format.WMSCapabilities();
     var wmsLayers = [];
     var wmsHtmlContent = '';
-    for (const element of wmsLayersConfig) {
-    //wmsLayersConfig.forEach(async(element) => {
-        wmsHtmlContent += `<h3>${element.title}</h3>`;
-        var WMSrawCap = await fetch(sanitizeUrl(element.serverurl) + `&SERVICE=WMS&VERSION=${element.version}&REQUEST=Capabilities`).then((response) => response.text())
-        var WMSCapabilites = WMSparser.read(WMSrawCap);
-        element.layers.forEach(layer => {
-            wmsHtmlContent += `<input type="radio" name="wmsLayersRadioButton" value="${layer.name}">${layer.title}<br>`;
-            var newLayer = new ol.layer.Image({
-                extent: extent,
-                visible: false,
-                title: layer.title,
-                name: layer.name,
-                source: new ol.source.ImageWMS({
-                    url: sanitizeUrl(element.serverurl),
-                    crossOrigin: 'anonymous',
-                    params: {
-                    'LAYERS': layer.name,
-                    'FORMAT': 'image/png',
-                    'VERSION': element.version
-                    },
-                    serverType: 'mapserver',
-                })
-                });
-            wmsLayers.push(newLayer);
+    // for (const element of wmsLayersConfig) {
+    // //wmsLayersConfig.forEach(async(element) => {
+    wmsHtmlContent += `<h3>${element.title}</h3>`;
+    var WMSrawCap = await fetch(sanitizeUrl(element.serverurl) + `&SERVICE=WMS&VERSION=${element.version}&REQUEST=Capabilities`).then((response) => response.text())
+    var WMSCapabilites = WMSparser.read(WMSrawCap);
+    element.layers.forEach(layer => {
+        wmsHtmlContent += `<input type="radio" name="layersRadioButton" value="${layer.name}">${layer.title}<br>`;
+        var newLayer = new ol.layer.Image({
+            extent: extent,
+            visible: false,
+            title: layer.title,
+            name: layer.name,
+            source: new ol.source.ImageWMS({
+                url: sanitizeUrl(element.serverurl),
+                crossOrigin: 'anonymous',
+                params: {
+                'LAYERS': layer.name,
+                'FORMAT': 'image/png',
+                'VERSION': element.version
+                },
+                serverType: 'mapserver',
+            })
+            });
+        wmsLayers.push(newLayer);
 
-        });
-    }
+    });
+    // }
     return {layers: wmsLayers, htmlPart: wmsHtmlContent};
+}
+
+async function createLayerTree(config, projection){
+    var layerTree = {
+        "layers":[],
+        "html":''
+    };
+    var partLayerTree;
+    for (const element of config.layertree) {
+        if (element.type === 'wmts'){
+            partLayerTree = createWMTSlayers(element, projection)
+        }
+        else if (element.type === 'wms'){
+            partLayerTree = createWMSlayers(element)
+        }
+        layerTree.layers.push((await partLayerTree).layers);
+        layerTree.html += (await partLayerTree).htmlPart;
+    }
+    layerTree.layers = [].concat.apply([], layerTree.layers);
+    return layerTree;
 }
 
 
@@ -171,18 +193,18 @@ async function main(){
         view: mapview,
     });
     map.addLayer(WMTSBaseLayerGroup);
-    const layerConfig = await fetch(configFile).then((response) => response.json());
-    console.log(`layerConfig : ${layerConfig}`);
+    const layerTreeConfig = await fetch(configFile).then((response) => response.json());
+    console.log(`layerTreeConfig : ${layerTreeConfig}`);
 
-    var LayersHtmlContent = '';
-    var wmsStuff = createWMSlayers(layerConfig.wms);
+    var LayersHtmlContent = '<h2>Layers</h2><input type="radio" name="layersRadioButton" value="None">None<br>';
+    var wmsStuff = createLayerTree(layerTreeConfig, projection2056);
     
     const LayerGroup = new ol.layer.Group({
         layers: (await wmsStuff).layers,
     })
     map.addLayer(LayerGroup);
     
-    document.getElementById('layers').innerHTML = LayersHtmlContent + (await wmsStuff).htmlPart;
+    document.getElementById('layers').innerHTML = LayersHtmlContent + (await wmsStuff).html;
     // const LayerGroup = new ol.layer.Group({
     //     layers: wmsLayers,
     // })
@@ -234,9 +256,15 @@ async function main(){
             })
         })
     }
+    document.addEventListener("recenter", function(event) {
+        console.log(event);
+        console.log(`setCenter([${event.detail.east}, ${event.detail.north}])`)
+        mapview.setCenter([event.detail.east, event.detail.north]);
+    });
 }
 
-// function recenter(east, north) {
-//     var map = document.getElementById('js-map');
-//     map.getView().setCenter([east, north]);
-// }
+function recenter(east, north) {
+    console.log(`"recenter", {east: ${east}, north: ${north}}`)  
+    let event = new CustomEvent("recenter", {detail:{east: east, north: north}});
+    document.dispatchEvent(event);
+}
