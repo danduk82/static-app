@@ -16,7 +16,7 @@
                 }
             ]
         },{
-            "serverurl":"https://geowms.bl.ch?",
+            "serverurl":"https://geowms.bl.ch",
             "title": "WMS canton BL",
             "version": "1.1.1",
             "layers": [

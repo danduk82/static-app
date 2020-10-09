@@ -19,6 +19,15 @@ function parseUrlList(parameter, callback){
     return a
 }
 
+/**
+ * checks that there is a '?' characher in WMS server url, otherwise adds it to the url
+ * @returns String: the sanitized url
+ * @param {*} url 
+ */
+function sanitizeUrl(url){
+    return (url.indexOf('?') < 0) ? url+'?' : url;
+}
+
 async function createWMTSlayers(wmtsLayersConfig, projection){
     var WMTSparser = new ol.format.WMTSCapabilities();
     var wmtsLayers = [];
@@ -57,7 +66,7 @@ async function createWMSlayers(wmsLayersConfig){
     for (const element of wmsLayersConfig) {
     //wmsLayersConfig.forEach(async(element) => {
         wmsHtmlContent += `<h3>${element.title}</h3>`;
-        var WMSrawCap = await fetch(element.serverurl + `&SERVICE=WMS&VERSION=${element.version}&REQUEST=Capabilities`).then((response) => response.text())
+        var WMSrawCap = await fetch(sanitizeUrl(element.serverurl) + `&SERVICE=WMS&VERSION=${element.version}&REQUEST=Capabilities`).then((response) => response.text())
         var WMSCapabilites = WMSparser.read(WMSrawCap);
         element.layers.forEach(layer => {
             wmsHtmlContent += `<input type="radio" name="wmsLayersRadioButton" value="${layer.name}">${layer.title}<br>`;
@@ -67,7 +76,7 @@ async function createWMSlayers(wmsLayersConfig){
                 title: layer.title,
                 name: layer.name,
                 source: new ol.source.ImageWMS({
-                    url: element.serverurl,
+                    url: sanitizeUrl(element.serverurl),
                     crossOrigin: 'anonymous',
                     params: {
                     'LAYERS': layer.name,
