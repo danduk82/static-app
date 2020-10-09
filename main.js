@@ -30,18 +30,19 @@ function sanitizeUrl(url){
 
 function clearRadioButton(radioButtonId){
     var ele = document.getElementsByName(radioButtonId);
-   for(var i=0;i<ele.length;i++)
-      ele[i].checked = false;
+    for(var i=0;i<ele.length;i++)
+    console.log(ele[i]);
+        ele[i].checked = false;
 }
 
-async function createWMTSlayers(element, projection){
+async function createWMTSlayers(element, projection, radioButtonId){
     var WMTSparser = new ol.format.WMTSCapabilities();
     var wmtsLayers = [];
-    var wmtsHtmlContent = '';
+    var wmtsHtmlContent = element.title ? `<h3>${element.title}</h3>`:'';
     var capabilitiesText = await fetch(element.serverurl).then((response) => response.text());
     var WMTScapabilities = WMTSparser.read(capabilitiesText);
-    wmtsHtmlContent += `<h3>${element.title}</h3>`;
     element.layers.forEach(layer => {
+        visible = layer.checked ? true : false
         var wmtsLayer = new ol.layer.Tile({
             opacity: 1,
             source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
@@ -51,30 +52,30 @@ async function createWMTSlayers(element, projection){
             })),
             title: layer.title,
             name: layer.name,
-            visible: false
+            visible: visible
         })
         wmtsLayers.push(wmtsLayer);
-        wmtsHtmlContent += `<input type="radio" name="layersRadioButton" value="${layer.name}">${layer.title}<br>`;
+        checked = visible ? 'checked' : '';
+        wmtsHtmlContent += `<input type="radio" ${checked}  name="${radioButtonId}" value="${layer.name}">${layer.title}<br>`;
     });
     return {layers: wmtsLayers, htmlPart: wmtsHtmlContent};
 }
 
 
-async function createWMSlayers(element){
+async function createWMSlayers(element, radioButtonId){
     // construct WMS layer tree
     var WMSparser = new ol.format.WMSCapabilities();
     var wmsLayers = [];
-    var wmsHtmlContent = '';
-    // for (const element of wmsLayersConfig) {
-    // //wmsLayersConfig.forEach(async(element) => {
-    wmsHtmlContent += `<h3>${element.title}</h3>`;
+    var wmsHtmlContent = element.title ? `<h3>${element.title}</h3>`:'';
     var WMSrawCap = await fetch(sanitizeUrl(element.serverurl) + `&SERVICE=WMS&VERSION=${element.version}&REQUEST=Capabilities`).then((response) => response.text())
     var WMSCapabilites = WMSparser.read(WMSrawCap);
     element.layers.forEach(layer => {
-        wmsHtmlContent += `<input type="radio" name="layersRadioButton" value="${layer.name}">${layer.title}<br>`;
+        visible = layer.checked ? true : false
+        checked = visible ? 'checked' : '';
+        wmsHtmlContent += `<input type="radio" ${checked} name="${radioButtonId}" value="${layer.name}">${layer.title}<br>`;
         var newLayer = new ol.layer.Image({
             extent: extent,
-            visible: false,
+            visible: visible,
             title: layer.title,
             name: layer.name,
             source: new ol.source.ImageWMS({
@@ -91,22 +92,21 @@ async function createWMSlayers(element){
         wmsLayers.push(newLayer);
 
     });
-    // }
     return {layers: wmsLayers, htmlPart: wmsHtmlContent};
 }
 
-async function createLayerTree(config, projection){
+async function createLayerTree(config, projection, radioButtonId){
     var layerTree = {
         "layers":[],
         "html":''
     };
     var partLayerTree;
-    for (const element of config.layertree) {
+    for (const element of config) {
         if (element.type === 'wmts'){
-            partLayerTree = createWMTSlayers(element, projection)
+            partLayerTree = createWMTSlayers(element, projection, radioButtonId)
         }
         else if (element.type === 'wms'){
-            partLayerTree = createWMSlayers(element)
+            partLayerTree = createWMSlayers(element, radioButtonId)
         }
         layerTree.layers.push((await partLayerTree).layers);
         layerTree.html += (await partLayerTree).htmlPart;
@@ -117,15 +117,13 @@ async function createLayerTree(config, projection){
 
 
 async function main(){
+    // parse URL parameters
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    
     var center = urlParams.get('center') ? parseUrlList(urlParams.get('center'), parseFloat) : [2561892.6539999316,1205224.086300917]
-    console.log(center);
     var configFile = urlParams.get('config') ? urlParams.get('config') : './layer-config.json';
 
-    var WMTSparser = new ol.format.WMTSCapabilities();
-        
+    // define the swiss LV95 projection
     var projection2056 = new ol.proj.Projection({
       code: 'EPSG:2056',
       // The extent is used to determine zoom level 0. Recommended values for a
@@ -137,80 +135,69 @@ async function main(){
     // We have to set the extent!
     projection2056.setExtent([2420000, 130000, 2900000, 1350000]);
 
+    // create the map component
     const mapview = new ol.View({
         center: center,
         projection: projection2056,
         zoom: 14,
     });
-    // var capabilitesResponse = await fetch('https://wmts.geo.admin.ch/EPSG/2056/1.0.0/WMTSCapabilities.xml');
-    // const capabilitiesText = capabilitesResponse.capabilitiesText()
-    const allCaps = [
-        fetch('https://wmts.geo.admin.ch/EPSG/2056/1.0.0/WMTSCapabilities.xml').then((response) => response.text())
-    ];
-    const allCapabilites = await Promise.all(allCaps);
-    // const capabilitiesText = await fetch('https://wmts.geo.admin.ch/EPSG/2056/1.0.0/WMTSCapabilities.xml').then((response) => response.text());
-    // var WMTScapabilities = WMTSparser.read(capabilitiesText);
-    var WMTScapabilities = WMTSparser.read(allCapabilites[0]);
-    const wmtsLayer1 = new ol.layer.Tile({
-        opacity: 1,
-        source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
-            layer: 'ch.swisstopo.swissimage-product',
-            matrixSet: '2056_26',
-            projection: projection2056,
-        })),
-        title: 'SwisstopoOrthophoto',
-        visible: true
-    }) 
-    const wmtsLayer2 = new ol.layer.Tile({
-        opacity: 1,
-        source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
-            layer: 'ch.swisstopo.pixelkarte-farbe',
-            matrixSet: '2056_26',
-            projection: projection2056,
-        })),
-        title: 'SwisstopoColorBaseMap',
-        visible: false
-    }) 
-    const wmtsLayer3 = new ol.layer.Tile({
-        opacity: 1,
-        source: new ol.source.WMTS(ol.source.WMTS.optionsFromCapabilities(WMTScapabilities, {
-            layer: 'ch.swisstopo.pixelkarte-grau',
-            matrixSet: '2056_26',
-            projection: projection2056,
-        })),
-        title: 'SwisstopoGreyBaseMap',
-        visible: false
-    }) 
- 
-    const WMTSBaseLayerGroup = new ol.layer.Group({
-        layers: [
-            wmtsLayer1, wmtsLayer2, wmtsLayer3
-        ]
-    })
-    
     const map = new ol.Map({
         target: 'js-map',
         view: mapview,
     });
-    map.addLayer(WMTSBaseLayerGroup);
-    const layerTreeConfig = await fetch(configFile).then((response) => response.json());
-    console.log(`layerTreeConfig : ${layerTreeConfig}`);
 
-    var LayersHtmlContent = '<h2>Layers</h2><input type="radio" name="layersRadioButton" value="None">None<br>';
-    var wmsStuff = createLayerTree(layerTreeConfig, projection2056);
+    // load layer tree config from config file
+    const layerTreeConfig = await fetch(configFile).then((response) => response.json());
     
+    // base layers
+    const baseLayersRadioButtonId = 'baseLayersRadioButton';
+    var baseLayersHtmlContent = `<h2>Base layers</h2>`;
+    var baseLayersStuff = createLayerTree(layerTreeConfig.baselayers, projection2056, baseLayersRadioButtonId);
+    const WMTSBaseLayerGroup = new ol.layer.Group({
+        layers: (await baseLayersStuff).layers
+    })
+    map.addLayer(WMTSBaseLayerGroup);
+    document.getElementById('baselayers').innerHTML = baseLayersHtmlContent + (await baseLayersStuff).html + `<input type="radio" name="${baseLayersRadioButtonId}" value="None">None<br>`;
+
+    // normal layers
+    const layersRadioButtonId = 'layersRadioButton';
+    var layersHtmlContent = `<h2>Layers</h2><input type="radio" name="${layersRadioButtonId}" value="None">None<br>`;
+    var layersStuff = createLayerTree(layerTreeConfig.layertree, projection2056, layersRadioButtonId);
     const LayerGroup = new ol.layer.Group({
-        layers: (await wmsStuff).layers,
+        layers: (await layersStuff).layers,
     })
     map.addLayer(LayerGroup);
-    
-    document.getElementById('layers').innerHTML = LayersHtmlContent + (await wmsStuff).html;
-    // const LayerGroup = new ol.layer.Group({
-    //     layers: wmsLayers,
-    // })
-    // map.addLayer(LayerGroup);
-    // document.getElementById('layers').innerHTML = wmsHtmlContent;
+    document.getElementById('layers').innerHTML = layersHtmlContent + (await layersStuff).html;
 
+    // layer selector
+    const LayerElements = document.querySelectorAll('.layers > input[type=radio]');
+
+    // registerChangeEventOnLayerTree(LayerElements, LayerGroup);
+    for(let LayerElement of LayerElements){
+        LayerElement.addEventListener('change', function(){
+            let LayerElementValue = this.value;
+            LayerGroup.getLayers().forEach(function(element, index, array){
+               let layerTitle = element.get('name');
+               element.setVisible(layerTitle === LayerElementValue);
+            })
+        })
+    }
+
+    // basemap selector
+    const baseLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
+    // registerChangeEventOnLayerTree(baseLayerElements, WMTSBaseLayerGroup);
+    
+    for(let baseLayerElement of baseLayerElements){
+        baseLayerElement.addEventListener('change', function(){
+            let baseLayerElementValue = this.value;
+            WMTSBaseLayerGroup.getLayers().forEach(function(element, index, array){
+               let baseLayerTitle = element.get('name');
+               element.setVisible(baseLayerTitle === baseLayerElementValue);
+            })
+        })
+    }
+    
+    // overlay for popup infobox
     const overlayContainerElement = document.querySelector('.overlay-container');
     // const overlayLayer = ol.Overlay({
     //     element: overlayContainerElement
@@ -233,38 +220,15 @@ async function main(){
         // })
     })
 
-    // layer selector
-    const LayerElements = document.querySelectorAll('.layers > input[type=radio]');
-    for(let LayerElement of LayerElements){
-        LayerElement.addEventListener('change', function(){
-            let LayerElementValue = this.value;
-            LayerGroup.getLayers().forEach(function(element, index, array){
-               let layerTitle = element.get('name');
-               element.setVisible(layerTitle === LayerElementValue);
-            })
-        })
-    }
 
-    // basemap selector
-    const baseLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
-    for(let baseLayerElement of baseLayerElements){
-        baseLayerElement.addEventListener('change', function(){
-            let baseLayerElementValue = this.value;
-            WMTSBaseLayerGroup.getLayers().forEach(function(element, index, array){
-               let baseLayerTitle = element.get('title');
-               element.setVisible(baseLayerTitle === baseLayerElementValue);
-            })
-        })
-    }
+    // register a "recenter" event so that we can move the focus point without reloading the app
     document.addEventListener("recenter", function(event) {
-        console.log(event);
-        console.log(`setCenter([${event.detail.east}, ${event.detail.north}])`)
         mapview.setCenter([event.detail.east, event.detail.north]);
     });
 }
 
+// define a recenter() function so that we can move the focus point without reloading the app from the console
 function recenter(east, north) {
-    console.log(`"recenter", {east: ${east}, north: ${north}}`)  
     let event = new CustomEvent("recenter", {detail:{east: east, north: north}});
     document.dispatchEvent(event);
 }
