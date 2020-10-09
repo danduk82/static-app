@@ -1,8 +1,13 @@
 window.onload = main;
+
+// keep this resolution as reminder, as it is the default resolutions of geo.admin.ch
+// and it is difficult to find their definition, even if we do not use it right now
 const resolutions = [
     4000, 3750, 3500, 3250, 3000, 2750, 2500, 2250, 2000, 1750, 1500, 1250,
     1000, 750, 650, 500, 250, 100, 50, 20, 10, 5, 2.5, 2, 1.5, 1, 0.5
 ];
+
+// FIXME: remove this global variable and put it as parameter or in the config
 const extent = [2420000.0, 1030000.0, 2900000.0, 1350000.0];
  
 
@@ -28,13 +33,12 @@ function sanitizeUrl(url){
     return (url.indexOf('?') < 0) ? url+'?' : url;
 }
 
-function clearRadioButton(radioButtonId){
-    var ele = document.getElementsByName(radioButtonId);
-    for(var i=0;i<ele.length;i++)
-    console.log(ele[i]);
-        ele[i].checked = false;
-}
-
+/**
+ * for a given configuration WMTS element, create the WMTS layer in OL and the html partial for the layer tree 
+ * @param {*} element 
+ * @param {*} projection 
+ * @param {*} radioButtonId 
+ */
 async function createWMTSlayers(element, projection, radioButtonId){
     var WMTSparser = new ol.format.WMTSCapabilities();
     var wmtsLayers = [];
@@ -61,7 +65,11 @@ async function createWMTSlayers(element, projection, radioButtonId){
     return {layers: wmtsLayers, htmlPart: wmtsHtmlContent};
 }
 
-
+/**
+ * for a given configuration WMS element, create the WMS layer in OL and the html partial for the layer tree
+ * @param {*} element 
+ * @param {*} radioButtonId 
+ */
 async function createWMSlayers(element, radioButtonId){
     // construct WMS layer tree
     var WMSparser = new ol.format.WMSCapabilities();
@@ -95,6 +103,12 @@ async function createWMSlayers(element, radioButtonId){
     return {layers: wmsLayers, htmlPart: wmsHtmlContent};
 }
 
+/**
+ * create the full layer tree html component and register the layers as OL layers
+ * @param {*} config 
+ * @param {*} projection 
+ * @param {*} radioButtonId 
+ */
 async function createLayerTree(config, projection, radioButtonId){
     var layerTree = {
         "layers":[],
@@ -115,6 +129,34 @@ async function createLayerTree(config, projection, radioButtonId){
     return layerTree;
 }
 
+/**
+ * function that registers a "change" event listener on each layer of all LayerElements (html radio button)
+ * to change also the "visible" attribute of the corresponding layer in a LayerGroup
+ * @param {*} LayerElements 
+ * @param {*} LayerGroup 
+ */
+function registerChangeEventOnLayerTree(LayerElements, LayerGroup){
+    for(let LayerElement of LayerElements){
+        LayerElement.addEventListener('change', function(){
+            let LayerElementValue = this.value;
+            LayerGroup.getLayers().forEach(function(element, index, array){
+            let layerTitle = element.get('name');
+            element.setVisible(layerTitle === LayerElementValue);
+            })
+        })
+    }
+}
+
+
+/**
+ * function to move the focus point without reloading the app from the console
+ * @param {*} east 
+ * @param {*} north 
+ */
+function recenter(east, north) {
+    let event = new CustomEvent("recenter", {detail:{east: east, north: north}});
+    document.dispatchEvent(event);
+}
 
 async function main(){
     // parse URL parameters
@@ -145,19 +187,26 @@ async function main(){
         target: 'js-map',
         view: mapview,
     });
+    // register a "recenter" event so that we can move the focus point without reloading the app
+    document.addEventListener("recenter", function(event) {
+        mapview.setCenter([event.detail.east, event.detail.north]);
+    });
 
     // load layer tree config from config file
     const layerTreeConfig = await fetch(configFile).then((response) => response.json());
     
-    // base layers
+    // background layers
     const baseLayersRadioButtonId = 'baseLayersRadioButton';
-    var baseLayersHtmlContent = `<h2>Base layers</h2>`;
+    var baseLayersHtmlContent = `<h2>Background</h2>`;
     var baseLayersStuff = createLayerTree(layerTreeConfig.baselayers, projection2056, baseLayersRadioButtonId);
     const WMTSBaseLayerGroup = new ol.layer.Group({
         layers: (await baseLayersStuff).layers
     })
     map.addLayer(WMTSBaseLayerGroup);
     document.getElementById('baselayers').innerHTML = baseLayersHtmlContent + (await baseLayersStuff).html + `<input type="radio" name="${baseLayersRadioButtonId}" value="None">None<br>`;
+    // basemap selector
+    const baseLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
+    registerChangeEventOnLayerTree(baseLayerElements, WMTSBaseLayerGroup);
 
     // normal layers
     const layersRadioButtonId = 'layersRadioButton';
@@ -168,35 +217,13 @@ async function main(){
     })
     map.addLayer(LayerGroup);
     document.getElementById('layers').innerHTML = layersHtmlContent + (await layersStuff).html;
-
     // layer selector
     const LayerElements = document.querySelectorAll('.layers > input[type=radio]');
-
-    // registerChangeEventOnLayerTree(LayerElements, LayerGroup);
-    for(let LayerElement of LayerElements){
-        LayerElement.addEventListener('change', function(){
-            let LayerElementValue = this.value;
-            LayerGroup.getLayers().forEach(function(element, index, array){
-               let layerTitle = element.get('name');
-               element.setVisible(layerTitle === LayerElementValue);
-            })
-        })
-    }
-
-    // basemap selector
-    const baseLayerElements = document.querySelectorAll('.baselayers > input[type=radio]');
-    // registerChangeEventOnLayerTree(baseLayerElements, WMTSBaseLayerGroup);
+    registerChangeEventOnLayerTree(LayerElements, LayerGroup);
     
-    for(let baseLayerElement of baseLayerElements){
-        baseLayerElement.addEventListener('change', function(){
-            let baseLayerElementValue = this.value;
-            WMTSBaseLayerGroup.getLayers().forEach(function(element, index, array){
-               let baseLayerTitle = element.get('name');
-               element.setVisible(baseLayerTitle === baseLayerElementValue);
-            })
-        })
-    }
-    
+
+
+    // TODO: add an 
     // overlay for popup infobox
     const overlayContainerElement = document.querySelector('.overlay-container');
     // const overlayLayer = ol.Overlay({
@@ -220,15 +247,6 @@ async function main(){
         // })
     })
 
-
-    // register a "recenter" event so that we can move the focus point without reloading the app
-    document.addEventListener("recenter", function(event) {
-        mapview.setCenter([event.detail.east, event.detail.north]);
-    });
 }
 
-// define a recenter() function so that we can move the focus point without reloading the app from the console
-function recenter(east, north) {
-    let event = new CustomEvent("recenter", {detail:{east: east, north: north}});
-    document.dispatchEvent(event);
-}
+

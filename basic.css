@@ -21,12 +21,12 @@ body {
 .baselayers{
     border: 1px solid #848584;
     overflow: scroll;
-    height: 20vh;
+    height: 30vh;
 }
 .layers {
     border: 1px solid #848584;
     overflow-x: scroll;
-    height: 80vh;
+    height: 70vh;
 }
 .map {
     height: 100vh;
