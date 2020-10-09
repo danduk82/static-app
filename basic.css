@@ -23,7 +23,7 @@ body {
     overflow: scroll;
     height: 20vh;
 }
-.wmslayers {
+.layers {
     border: 1px solid #848584;
     overflow-x: scroll;
     height: 80vh;
